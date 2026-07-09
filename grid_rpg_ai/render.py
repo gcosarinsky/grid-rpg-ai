@@ -5,7 +5,7 @@ from typing import Dict, Iterable, Optional, Tuple
 
 from PIL import Image, ImageColor, ImageDraw
 
-from data.biomes import BIOMES, VALID_BIOME_KEYS, get_biome
+from grid_rpg_ai.data.biomes import BIOMES, VALID_BIOME_KEYS, get_biome
 
 
 Coord = Tuple[int, int]

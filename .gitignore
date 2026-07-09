@@ -1,0 +1,4 @@
+/.venv
+/grid_rpg_ai.egg-info
+
+*.pyc

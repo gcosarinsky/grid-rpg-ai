@@ -1,0 +1,36 @@
+grid-rpg-ai/
+├── pyproject.toml
+├── docs/
+│   ├── file_tree.txt
+│   ├── fog-of-war-llm-rpg-sketch.md
+│   ├── gamestate_to_prompt.md
+│   ├── llm-map-generation-idea.md
+│   ├── Proyecto_RPG_LLM.md
+│   └── rpg_llm_mvp_roadmap.md
+├── examples/
+│   └── print_default_map.py
+├── grid_rpg_ai/
+│   ├── gamestate.py
+│   ├── render.py
+│   ├── assets/
+│   │   ├── raw/
+│   │   └── tiles/
+│   └── data/
+│       ├── __init__.py
+│       ├── biomes.py
+│       ├── dataevents.py
+│       ├── mapgen_prompt.py
+│       └── maps.py
+├── grid_rpg_ai.egg-info/
+│   ├── dependency_links.txt
+│   ├── PKG-INFO
+│   ├── SOURCES.txt
+│   └── top_level.txt
+├── tests/
+│   └── test_gamestate.py
+├── .git/
+├── .gitignore
+├── .venv/
+├── default_map_colors.png
+├── default_map_tiles_folder.png
+└── render_demo_biomes.png

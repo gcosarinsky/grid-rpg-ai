@@ -68,6 +68,19 @@ Planned module responsibilities:
 
 This structure keeps rendering independent from rules, and it makes the project easier to test and extend.
 
+## Fog of war sandbox
+
+The experimental Streamlit demo lets you move around the starter map and inspect the fog of war without using the game engine:
+
+```powershell
+uv sync
+uv run streamlit run examples/fog_sandbox.py
+```
+
+`uv sync` installs the project in editable mode, so the demo imports `grid_rpg_ai` as an installed package rather than modifying `sys.path`.
+
+Use the arrow buttons to move. The sandbox supports color or image tiles, an adjustable vision radius, and a fog toggle for comparison. Its player and goal markers are procedurally drawn RGBA sprites with transparent backgrounds.
+
 ## Why this project
 
 This is meant to be a compact demo of applied AI engineering rather than a full RPG.

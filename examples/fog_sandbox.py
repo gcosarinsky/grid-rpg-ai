@@ -17,10 +17,10 @@ from grid_rpg_ai.render import (
 
 MAP = get_map()
 DIRECTIONS = {
-    "Arriba": (0, -1),
-    "Izquierda": (-1, 0),
-    "Abajo": (0, 1),
-    "Derecha": (1, 0),
+    "Up": (0, -1),
+    "Left": (-1, 0),
+    "Down": (0, 1),
+    "Right": (1, 0),
 }
 
 
@@ -43,9 +43,9 @@ def attempt_move(
     dx, dy = DIRECTIONS[direction]
     destination = (position[0] + dx, position[1] + dy)
     if not in_bounds(game_map, *destination):
-        return position, "No puedes salirte del mapa."
+        return position, "You cannot leave the map."
     if not is_walkable(game_map, *destination):
-        return position, "Ese terreno bloquea el paso."
+        return position, "That terrain blocks movement."
     return destination, None
 
 
@@ -57,61 +57,75 @@ def initialize_session() -> None:
 
 
 def main() -> None:
-    st.set_page_config(page_title="Fog of War Sandbox", page_icon="🧭")
+    st.set_page_config(
+        page_title="Fog of War Sandbox",
+        page_icon="🧭",
+        layout="wide",
+    )
+    st.markdown(
+        """
+        <style>
+            .block-container {
+                max-width: 100%;
+                padding-left: 1.5rem;
+                padding-right: 1.5rem;
+                padding-top: 1.5rem;
+            }
+            [data-testid="stSidebar"] .stButton > button {
+                min-height: 2.25rem;
+                padding: 0.25rem 0.5rem;
+            }
+            [data-testid="stVerticalBlockBorderWrapper"] {
+                margin-bottom: 0.25rem;
+            }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
     initialize_session()
     st.title("Fog of War Sandbox")
-    st.caption("Demo de movimiento en grilla y visibilidad; no usa el engine de juego.")
+    st.caption("Grid movement and visibility demo; it does not use the game engine.")
 
     with st.sidebar:
-        st.header("Configuración")
-        radius = st.slider("Radio de visión", min_value=1, max_value=4, value=2)
-        fog_enabled = st.checkbox("Activar fog of war", value=True)
-        tile_mode = st.radio("Estilo de tiles", options=["colors", "folder"], horizontal=True)
-        if st.button("Reiniciar posición", use_container_width=True):
+        st.header("Settings")
+        radius = st.slider("Vision radius", min_value=1, max_value=4, value=2)
+        map_zoom = st.slider(
+            "Map zoom",
+            min_value=50,
+            max_value=200,
+            value=100,
+            step=10,
+            format="%d%%",
+        )
+        fog_enabled = st.checkbox("Enable fog of war", value=True)
+        tile_mode = st.radio("Tile style", options=["Colors", "Images"], horizontal=True)
+        tile_mode = "colors" if tile_mode == "Colors" else "folder"
+        if st.button("Reset position", use_container_width=True):
             st.session_state.player_pos = MAP.start
             st.session_state.discovered = set()
             st.session_state.move_message = ""
 
-    position = st.session_state.player_pos
-    visibility = compute_visibility(
-        MAP.width,
-        MAP.height,
-        position,
-        st.session_state.discovered,
-        radius,
-    )
-    st.session_state.discovered.update(
-        (x, y)
-        for y, row in enumerate(visibility)
-        for x, state in enumerate(row)
-        if state == "visible"
-    )
-    displayed_visibility = (
-        visibility
-        if fog_enabled
-        else [["visible"] * MAP.width for _ in range(MAP.height)]
-    )
-
-    st.subheader("Mover")
-    top = st.columns(3)
-    if top[1].button("⬆️", use_container_width=True, help="Mover arriba"):
-        position, message = attempt_move(MAP, position, "Arriba")
-        st.session_state.player_pos = position
-        st.session_state.move_message = message or ""
-    middle = st.columns(3)
-    if middle[0].button("⬅️", use_container_width=True, help="Mover a la izquierda"):
-        position, message = attempt_move(MAP, position, "Izquierda")
-        st.session_state.player_pos = position
-        st.session_state.move_message = message or ""
-    if middle[2].button("➡️", use_container_width=True, help="Mover a la derecha"):
-        position, message = attempt_move(MAP, position, "Derecha")
-        st.session_state.player_pos = position
-        st.session_state.move_message = message or ""
-    bottom = st.columns(3)
-    if bottom[1].button("⬇️", use_container_width=True, help="Mover abajo"):
-        position, message = attempt_move(MAP, position, "Abajo")
-        st.session_state.player_pos = position
-        st.session_state.move_message = message or ""
+        st.divider()
+        st.subheader("Move")
+        top = st.columns(3)
+        if top[1].button("⬆️", use_container_width=True, help="Move up"):
+            position, message = attempt_move(MAP, st.session_state.player_pos, "Up")
+            st.session_state.player_pos = position
+            st.session_state.move_message = message or ""
+        middle = st.columns(3)
+        if middle[0].button("⬅️", use_container_width=True, help="Move left"):
+            position, message = attempt_move(MAP, st.session_state.player_pos, "Left")
+            st.session_state.player_pos = position
+            st.session_state.move_message = message or ""
+        if middle[2].button("➡️", use_container_width=True, help="Move right"):
+            position, message = attempt_move(MAP, st.session_state.player_pos, "Right")
+            st.session_state.player_pos = position
+            st.session_state.move_message = message or ""
+        bottom = st.columns(3)
+        if bottom[1].button("⬇️", use_container_width=True, help="Move down"):
+            position, message = attempt_move(MAP, st.session_state.player_pos, "Down")
+            st.session_state.player_pos = position
+            st.session_state.move_message = message or ""
 
     position = st.session_state.player_pos
     visibility = compute_visibility(
@@ -144,14 +158,18 @@ def main() -> None:
         tile_size=TILE_SIZE,
         goal_pos=MAP.goal,
     )
-    st.image(frame, use_container_width=True)
+    display_width = round(frame.width * 2.5 * map_zoom / 100)
+    st.image(frame, width=display_width)
 
     biome = MAP.biome_at(*position)
-    st.write(f"**Posición:** x={position[0]}, y={position[1]}  ·  **Bioma:** {biome.display_name}")
+    st.write(
+        f"**Position:** x={position[0]}, y={position[1]}  ·  "
+        f"**Biome:** {biome.display_name}"
+    )
     if st.session_state.move_message:
         st.info(st.session_state.move_message)
     if position == MAP.goal:
-        st.success("¡Llegaste al objetivo!")
+        st.success("You reached the objective!")
 
 
 if __name__ == "__main__":

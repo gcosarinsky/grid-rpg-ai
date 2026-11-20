@@ -79,14 +79,14 @@ def test_render_frame_only_draws_goal_after_discovery() -> None:
 def test_sandbox_moves_only_to_walkable_cells_inside_the_map() -> None:
     game_map = create_default_map()
 
-    assert attempt_move(game_map, (0, 0), "Derecha") == ((1, 0), None)
-    assert attempt_move(game_map, (0, 0), "Izquierda") == (
+    assert attempt_move(game_map, (0, 0), "Right") == ((1, 0), None)
+    assert attempt_move(game_map, (0, 0), "Left") == (
         (0, 0),
-        "No puedes salirte del mapa.",
+        "You cannot leave the map.",
     )
-    assert attempt_move(game_map, (8, 3), "Derecha") == (
+    assert attempt_move(game_map, (8, 3), "Right") == (
         (8, 3),
-        "Ese terreno bloquea el paso.",
+        "That terrain blocks movement.",
     )
 
 

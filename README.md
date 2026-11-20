@@ -70,7 +70,7 @@ This structure keeps rendering independent from rules, and it makes the project 
 
 ## Fog of war sandbox
 
-The experimental Streamlit demo lets you move around the starter map and inspect the fog of war without using the game engine:
+The experimental Streamlit demo runs the integrated game loop: validated movement, biome events, persistent state, discovery, fog of war, and victory checks:
 
 ```powershell
 uv sync
@@ -79,7 +79,7 @@ uv run streamlit run examples/fog_sandbox.py
 
 `uv sync` installs the project in editable mode, so the demo imports `grid_rpg_ai` as an installed package rather than modifying `sys.path`.
 
-Use the arrow buttons to move. The sandbox supports color or image tiles, an adjustable vision radius, and a fog toggle for comparison. Its player and goal markers are procedurally drawn RGBA sprites with transparent backgrounds.
+Use the arrow buttons to move. The sandbox supports biome events, resettable `GameState`, recent-turn history, color or image tiles, an adjustable vision radius, and fog toggles. Its player and goal markers are procedurally drawn RGBA sprites with transparent backgrounds.
 
 ## Why this project
 

@@ -1,8 +1,8 @@
 from PIL import Image
 import pytest
 
-from grid_rpg_ai.data.maps import create_default_map
 from grid_rpg_ai.render import (
+    apply_fog,
     build_static_map,
     compute_visibility,
     load_tiles,
@@ -10,7 +10,6 @@ from grid_rpg_ai.render import (
     make_player_sprite,
     render_frame,
 )
-from examples.fog_sandbox import attempt_move
 
 
 def test_compute_visibility_tracks_current_and_previously_seen_tiles() -> None:
@@ -23,8 +22,8 @@ def test_compute_visibility_tracks_current_and_previously_seen_tiles() -> None:
     )
 
     assert visibility == [
-        ["seen", "unknown", "unknown", "unknown", "unknown"],
-        ["visible", "visible", "visible", "unknown", "unknown"],
+        ["seen", "visible", "visible", "visible", "unknown"],
+        ["unknown", "visible", "visible", "visible", "unknown"],
         ["unknown", "visible", "visible", "visible", "unknown"],
     ]
 
@@ -72,24 +71,6 @@ def test_render_frame_only_draws_goal_after_discovery() -> None:
         goal_sprite=goal_sprite,
     )
 
-    assert hidden_frame.getpixel((32 + 16, 16)) == base_map.getpixel((32 + 16, 16))
+    hidden_tile = apply_fog(tiles["forest"], "unknown")
+    assert hidden_frame.getpixel((32 + 16, 16)) == hidden_tile.getpixel((16, 16))
     assert shown_frame.getpixel((32 + 16, 16)) == (255, 0, 0, 255)
-
-
-def test_sandbox_moves_only_to_walkable_cells_inside_the_map() -> None:
-    game_map = create_default_map()
-
-    assert attempt_move(game_map, (0, 0), "Right") == ((1, 0), None)
-    assert attempt_move(game_map, (0, 0), "Left") == (
-        (0, 0),
-        "You cannot leave the map.",
-    )
-    assert attempt_move(game_map, (8, 3), "Right") == (
-        (8, 3),
-        "That terrain blocks movement.",
-    )
-
-
-def test_sandbox_rejects_unknown_movement_direction() -> None:
-    with pytest.raises(ValueError, match="Unknown movement direction"):
-        attempt_move(create_default_map(), (0, 0), "Diagonal")

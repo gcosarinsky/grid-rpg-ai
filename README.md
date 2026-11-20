@@ -154,7 +154,7 @@ The architecture and MVP scope are already defined, but the implementation is st
 
 ## Next steps
 
-- Create `rules.py` for movement validation, event resolution, and win checks.
+- Extend `rules.py` with event resolution on top of the implemented movement validation and win-state checks.
 - Build the Streamlit app in `app.py`.
 - Create and connect `llm.py` once the base loop is already playable.
 - Add `render.py` for map and status visualization.

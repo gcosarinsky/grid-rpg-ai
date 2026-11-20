@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
+# Coordinates throughout the engine use (x, y). Grid matrices use [y][x].
 Position = Tuple[int, int]
 DEFAULT_LOG_LIMIT = 100
 
@@ -55,6 +56,9 @@ class GameState:
         discovery grid is provided, a fresh one is created and the player's
         starting tile is marked as discovered.
         """
+        if self.rows <= 0 or self.cols <= 0:
+            raise ValueError("Map rows and columns must be positive")
+
         self.player_pos = self._clamp_pos(self.player_pos)
         self.goal_pos = self._clamp_pos(self.goal_pos)
 
@@ -63,21 +67,26 @@ class GameState:
                 [False for _ in range(self.cols)]
                 for _ in range(self.rows)
             ]
+        elif (
+            len(self.discovered) != self.rows
+            or any(len(row) != self.cols for row in self.discovered)
+        ):
+            raise ValueError("Discovery grid dimensions do not match rows and columns")
 
         self.discover(self.player_pos)
 
     def _clamp_pos(self, pos: Position) -> Position:
-        """Clamp a position so it always remains inside the map boundaries."""
-        r, c = pos
-        r = max(0, min(self.rows - 1, r))
-        c = max(0, min(self.cols - 1, c))
-        return (r, c)
+        """Clamp an ``(x, y)`` position to the map boundaries."""
+        x, y = pos
+        x = max(0, min(self.cols - 1, x))
+        y = max(0, min(self.rows - 1, y))
+        return (x, y)
 
     def discover(self, pos: Position) -> None:
-        """Mark a tile as discovered if the given position is in bounds."""
-        r, c = pos
-        if 0 <= r < self.rows and 0 <= c < self.cols:
-            self.discovered[r][c] = True
+        """Mark an ``(x, y)`` tile as discovered when it is in bounds."""
+        x, y = pos
+        if 0 <= x < self.cols and 0 <= y < self.rows:
+            self.discovered[y][x] = True
 
     def add_log(self, text: str) -> None:
         """Append a message to the log and trim it to the configured limit.

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, Iterable, Optional, Tuple
+from typing import Dict, Iterable, Optional, Set, Tuple
 
 from PIL import Image, ImageColor, ImageDraw
 
@@ -34,10 +34,89 @@ def make_color_tile(color: str, size: int = TILE_SIZE, label: Optional[str] = No
 def make_player_sprite(size: int = TILE_SIZE) -> Image.Image:
     img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
-    pad = size // 5
-    draw.ellipse((pad, pad, size - pad, size - pad), fill=(225, 80, 72, 255))
-    draw.ellipse((size // 2 - 3, size // 2 - 9, size // 2 + 3, size // 2 - 3), fill=(255, 255, 255, 220))
+    alpha = 225
+    ink = (25, 25, 35, alpha)
+    figure = (255, 235, 190, alpha)
+    width = max(1, size // 12)
+    cx = size // 2
+    head_radius = max(2, size // 9)
+    head_y = size // 4
+    shoulder_y = size // 2
+    hip_y = size * 3 // 4
+    draw.ellipse(
+        (cx - head_radius, head_y - head_radius, cx + head_radius, head_y + head_radius),
+        fill=figure,
+        outline=ink,
+        width=width,
+    )
+    draw.line((cx, head_y + head_radius, cx, hip_y), fill=ink, width=width)
+    draw.line((size // 4, shoulder_y, size * 3 // 4, shoulder_y), fill=ink, width=width)
+    draw.line((cx, hip_y, size // 3, size - 2), fill=ink, width=width)
+    draw.line((cx, hip_y, size * 2 // 3, size - 2), fill=ink, width=width)
     return img
+
+
+def make_goal_sprite(size: int = TILE_SIZE) -> Image.Image:
+    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    margin = max(3, size // 4)
+    center = size // 2
+    width = max(2, size // 7)
+    draw.line(
+        (center, margin, center, size - margin),
+        fill=(30, 25, 20, 225),
+        width=width + 2,
+    )
+    draw.line(
+        (margin, center, size - margin, center),
+        fill=(30, 25, 20, 225),
+        width=width + 2,
+    )
+    draw.line(
+        (center, margin, center, size - margin),
+        fill=(255, 220, 70, 230),
+        width=width,
+    )
+    draw.line(
+        (margin, center, size - margin, center),
+        fill=(255, 220, 70, 230),
+        width=width,
+    )
+    return img
+
+
+def compute_visibility(
+    width: int,
+    height: int,
+    player_pos: Coord,
+    discovered: Iterable[Coord],
+    radius: int,
+) -> list[list[str]]:
+    if width <= 0 or height <= 0:
+        raise ValueError("Map dimensions must be positive")
+    if radius < 0:
+        raise ValueError("Visibility radius must be non-negative")
+
+    px, py = player_pos
+    discovered_set: Set[Coord] = {
+        (x, y)
+        for x, y in discovered
+        if 0 <= x < width and 0 <= y < height
+    }
+    visible = {
+        (x, y)
+        for y in range(max(0, py - radius), min(height, py + radius + 1))
+        for x in range(max(0, px - radius), min(width, px + radius + 1))
+    }
+    discovered_set.update(visible)
+
+    return [
+        [
+            "visible" if (x, y) in visible else "seen" if (x, y) in discovered_set else "unknown"
+            for x in range(width)
+        ]
+        for y in range(height)
+    ]
 
 
 def load_tiles(
@@ -111,6 +190,8 @@ def render_frame(
     player_sprite: Optional[Image.Image] = None,
     tiles: Optional[Dict[str, Image.Image]] = None,
     tile_size: int = TILE_SIZE,
+    goal_pos: Optional[Coord] = None,
+    goal_sprite: Optional[Image.Image] = None,
 ) -> Image.Image:
     grid = [list(row) for row in grid]
     visibility = [list(row) for row in visibility]
@@ -130,7 +211,15 @@ def render_frame(
         player_sprite = make_player_sprite(tile_size)
 
     px, py = player_pos
-    frame.paste(player_sprite, (px * tile_size, py * tile_size), player_sprite)
+    frame.alpha_composite(player_sprite.convert("RGBA"), (px * tile_size, py * tile_size))
+
+    if goal_pos is not None:
+        gx, gy = goal_pos
+        if visibility[gy][gx] in {"visible", "seen"}:
+            if goal_sprite is None:
+                goal_sprite = make_goal_sprite(tile_size)
+            frame.alpha_composite(goal_sprite.convert("RGBA"), (gx * tile_size, gy * tile_size))
+
     return frame
 
 

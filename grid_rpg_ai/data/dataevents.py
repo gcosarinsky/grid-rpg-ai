@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from random import choice
+from random import Random, choice
 from typing import Dict, List, Optional
 
 from .biomes import BIOMES
@@ -16,6 +16,15 @@ class Event:
     effect: str
     description: str
     clue_text: Optional[str] = None
+
+
+ALLOWED_EVENT_EFFECTS = {
+    "none",
+    "block_move",
+    "push_random_adjacent",
+    "reveal_hint",
+    "give_clue",
+}
 
 
 EVENTS_BY_BIOME: Dict[str, List[Event]] = {
@@ -176,6 +185,14 @@ def validate_events() -> None:
                 raise ValueError(
                     f"Event {event.event_id!r} biome mismatch: {event.biome!r} != {biome_key!r}"
                 )
+            if event.effect not in ALLOWED_EVENT_EFFECTS:
+                raise ValueError(
+                    f"Event {event.event_id!r} has unsupported effect: {event.effect!r}"
+                )
+            if event.effect in {"reveal_hint", "give_clue"} and not event.clue_text:
+                raise ValueError(
+                    f"Event {event.event_id!r} requires clue_text for effect {event.effect!r}"
+                )
 
 
 validate_events()
@@ -187,11 +204,14 @@ def get_events_for_biome(biome_key: str) -> List[Event]:
     return EVENTS_BY_BIOME[biome_key]
 
 
-def choose_event_for_biome(biome_key: str) -> Optional[Event]:
+def choose_event_for_biome(
+    biome_key: str, rng: Optional[Random] = None
+) -> Optional[Event]:
+    """Select an event, optionally using an injected random source."""
     events = get_events_for_biome(biome_key)
     if not events:
         return None
-    return choice(events)
+    return rng.choice(events) if rng is not None else choice(events)
 
 
 def event_payload(event: Event) -> Dict[str, Optional[str]]:

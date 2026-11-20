@@ -113,17 +113,17 @@ The game should remain playable even if the LLM layer is removed. That is an imp
 
 ## Movement and events
 
-Movement is expected to be **mostly deterministic**.
+Movement is **mostly deterministic**. The rules engine first validates bounds and biome walkability. A valid arrival then has a configurable chance of triggering one event from the destination biome's static catalog.
 
-If the player chooses a direction, the engine first attempts that move. Then an event layer may do one of a few bounded things:
+Supported event effects are deliberately bounded:
 
-- No effect.
-- Block the move.
-- Redirect the player.
-- Reveal a clue.
-- Grant a small reward or hint.
+- No gameplay effect.
+- Block the intended move.
+- Redirect the player to a walkable adjacent tile.
+- Reveal and persist a clue.
+- Grant a clue from an encounter.
 
-For example, a wolf event may block the path, but the rules engine should decide that outcome. The LLM should narrate it, or at a later stage suggest event flavor that is validated before being applied.
+For example, a wolf event can cancel a valid forest move, while a sandstorm can push the player to another legal adjacent tile. Randomness is injectable so these outcomes remain reproducible in tests. The LLM should narrate the resolved result, or at a later stage suggest event flavor that is validated before being applied.
 
 ## Planned file tree
 

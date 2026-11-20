@@ -22,6 +22,7 @@ class MoveResult:
     success: bool
     turn_spent: bool = True
     event_type: Optional[str] = None
+    event_id: Optional[str] = None
     event_text: Optional[str] = None
     reward: Optional[Dict[str, int]] = None
     status_updates: Optional[Dict[str, bool]] = None

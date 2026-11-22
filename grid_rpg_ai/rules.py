@@ -6,6 +6,7 @@ from typing import Dict, Optional, Tuple
 from .data.dataevents import Event, choose_event_for_biome
 from .data.maps import MapData, in_bounds, is_walkable, neighbors
 from .gamestate import GameState, MoveResult, Position
+from .localization import Language, event_text, normalize_language, text
 
 DirectionDelta = Tuple[int, int]
 DEFAULT_EVENT_CHANCE = 0.35
@@ -54,11 +55,13 @@ def resolve_event(
     attempted_pos: Position,
     event: Event,
     rng: Optional[Random] = None,
+    language: Language = "en",
 ) -> MoveResult:
     """Resolve one catalog event into a bounded mechanical move result."""
     final_pos = attempted_pos
     success = True
-    event_text = event.description
+    description, clue_text = event_text(event.event_id, language)
+    event_message = description
     status_updates = None
 
     if event.effect == "block_move":
@@ -75,7 +78,7 @@ def resolve_event(
             final_pos = random_source.choice(destinations)
     elif event.effect in {"reveal_hint", "give_clue"}:
         status_updates = {f"clue_{event.event_id}": True}
-        event_text = f"{event.description} {event.clue_text}".strip()
+        event_message = f"{description} {clue_text}".strip()
     elif event.effect != "none":
         raise ValueError(f"Unsupported event effect: {event.effect!r}")
 
@@ -86,7 +89,7 @@ def resolve_event(
         success=success,
         event_type=event.event_type,
         event_id=event.event_id,
-        event_text=event_text,
+        event_text=event_message,
         status_updates=status_updates,
     )
 
@@ -97,6 +100,7 @@ def resolve_move(
     direction: str,
     rng: Optional[Random] = None,
     event_chance: float = DEFAULT_EVENT_CHANCE,
+    language: Language = "en",
 ) -> MoveResult:
     """Resolve movement and, on a valid move, an optional biome event.
 
@@ -108,6 +112,7 @@ def resolve_move(
         raise ValueError("GameState dimensions do not match the map")
     if not 0 <= event_chance <= 1:
         raise ValueError("event_chance must be between 0 and 1")
+    language = normalize_language(language)
 
     normalized, attempted_pos = intended_destination(state.player_pos, direction)
     final_pos = state.player_pos
@@ -119,7 +124,7 @@ def resolve_move(
             final_pos=final_pos,
             success=False,
             event_type="out_of_bounds",
-            event_text="You cannot leave the map.",
+            event_text=text("out_of_bounds", language),
         )
 
     if not is_walkable(game_map, *attempted_pos):
@@ -129,7 +134,7 @@ def resolve_move(
             final_pos=final_pos,
             success=False,
             event_type="blocked_terrain",
-            event_text="That terrain blocks movement.",
+            event_text=text("blocked_terrain", language),
         )
 
     random_source = rng if rng is not None else Random()
@@ -144,11 +149,24 @@ def resolve_move(
                 attempted_pos,
                 event,
                 random_source,
+                language,
             )
 
+    direction_text = {
+        "up": {"en": "up", "es": "arriba"},
+        "down": {"en": "down", "es": "abajo"},
+        "left": {"en": "left", "es": "a la izquierda"},
+        "right": {"en": "right", "es": "a la derecha"},
+    }[normalized][language]
     return MoveResult(
         intended_direction=normalized,
         attempted_pos=attempted_pos,
         final_pos=attempted_pos,
         success=True,
+        event_text=text(
+            "moved",
+            language,
+            direction=direction_text,
+            position=attempted_pos,
+        ),
     )

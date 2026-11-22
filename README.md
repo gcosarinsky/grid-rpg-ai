@@ -79,7 +79,9 @@ uv run streamlit run examples/fog_sandbox.py
 
 `uv sync` installs the project in editable mode, so the demo imports `grid_rpg_ai` as an installed package rather than modifying `sys.path`.
 
-Use the arrow buttons to move. The sandbox supports biome events, resettable `GameState`, recent-turn history, color or image tiles, an adjustable vision radius, and fog toggles. Its player and goal markers are procedurally drawn RGBA sprites with transparent backgrounds.
+Use the arrow buttons to move. The sandbox supports biome events, resettable `GameState`, recent-turn history, color or image tiles, an adjustable vision radius, fog toggles, and an English/Spanish language selector. The selected language also controls the mechanical event phrases and clues shown in the turn log. Its player and goal markers are procedurally drawn RGBA sprites with transparent backgrounds.
+
+The language selection is already carried into the rules layer through `resolve_move(..., language=...)`. When the LLM narration layer is connected, the same setting must be included in the narration prompt so generated narration, dialogue, and hints use the selected language too.
 
 ## Why this project
 

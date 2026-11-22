@@ -7,6 +7,13 @@ import streamlit as st
 
 from grid_rpg_ai.data.maps import get_map
 from grid_rpg_ai.gamestate import GameState
+from grid_rpg_ai.localization import (
+    LANGUAGE_LABELS,
+    SUPPORTED_LANGUAGES,
+    Language,
+    biome_name,
+    text,
+)
 from grid_rpg_ai.render import (
     TILE_SIZE,
     build_static_map,
@@ -44,9 +51,11 @@ def initialize_session() -> None:
         st.session_state.game_state = new_game_state()
     if "event_rng" not in st.session_state:
         st.session_state.event_rng = Random()
+    if "language" not in st.session_state:
+        st.session_state.language = "en"
 
 
-def move_player(direction: str, event_chance: float) -> None:
+def move_player(direction: str, event_chance: float, language: Language) -> None:
     state: GameState = st.session_state.game_state
     result = resolve_move(
         state,
@@ -54,17 +63,18 @@ def move_player(direction: str, event_chance: float) -> None:
         direction,
         rng=st.session_state.event_rng,
         event_chance=event_chance,
+        language=language,
     )
     state.apply_move_result(result)
 
 
-def render_narration_panel(sidebar: bool = False) -> None:
+def render_narration_panel(language: Language, sidebar: bool = False) -> None:
     extra_class = " narration-panel--sidebar" if sidebar else ""
     st.markdown(
         f"""
         <div class="narration-panel{extra_class}">
-            <div class="narration-label">Narration</div>
-            <p>The adventure narration will appear here.</p>
+            <div class="narration-label">{text("narration_label", language)}</div>
+            <p>{text("narration_placeholder", language)}</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -146,11 +156,16 @@ def main() -> None:
     )
     initialize_session()
     state: GameState = st.session_state.game_state
-
     with st.sidebar:
-        st.title("Grid RPG Engine Sandbox")
-        st.caption("Playable movement, biome events, discovery, and fog-of-war loop.")
-        st.subheader("Move")
+        language: Language = st.selectbox(
+            text("language", st.session_state.language),
+            options=list(SUPPORTED_LANGUAGES),
+            format_func=lambda value: LANGUAGE_LABELS[value],
+            key="language",
+        )
+        st.title(text("title", language))
+        st.caption(text("caption", language))
+        st.subheader(text("move", language))
         event_chance = (
             DEFAULT_EVENT_CHANCE
             if st.session_state.get("events_enabled", True)
@@ -159,29 +174,35 @@ def main() -> None:
         controls_disabled = state.is_victory()
         top = st.columns(3)
         if top[1].button(
-            "⬆️", use_container_width=True, help="Move up", disabled=controls_disabled
+            "⬆️",
+            use_container_width=True,
+            help=text("move_up", language),
+            disabled=controls_disabled,
         ):
-            move_player("up", event_chance)
+            move_player("up", event_chance, language)
         middle = st.columns(3)
         if middle[0].button(
-            "⬅️", use_container_width=True, help="Move left", disabled=controls_disabled
+            "⬅️", use_container_width=True, help=text("move_left", language), disabled=controls_disabled
         ):
-            move_player("left", event_chance)
+            move_player("left", event_chance, language)
         if middle[2].button(
-            "➡️", use_container_width=True, help="Move right", disabled=controls_disabled
+            "➡️", use_container_width=True, help=text("move_right", language), disabled=controls_disabled
         ):
-            move_player("right", event_chance)
+            move_player("right", event_chance, language)
         bottom = st.columns(3)
         if bottom[1].button(
-            "⬇️", use_container_width=True, help="Move down", disabled=controls_disabled
+            "⬇️",
+            use_container_width=True,
+            help=text("move_down", language),
+            disabled=controls_disabled,
         ):
-            move_player("down", event_chance)
+            move_player("down", event_chance, language)
 
         st.divider()
-        with st.expander("Settings", expanded=False):
-            radius = st.slider("Vision radius", min_value=1, max_value=4, value=2)
+        with st.expander(text("settings", language), expanded=False):
+            radius = st.slider(text("vision_radius", language), min_value=1, max_value=4, value=2)
             map_zoom = st.slider(
-                "Map zoom",
+                text("map_zoom", language),
                 min_value=50,
                 max_value=200,
                 value=100,
@@ -189,23 +210,23 @@ def main() -> None:
                 format="%d%%",
             )
             fog_enabled = st.checkbox(
-                "Enable fog of war", value=True, key="fog_enabled"
+                text("enable_fog", language), value=True, key="fog_enabled"
             )
             st.checkbox(
-                "Enable biome events", value=True, key="events_enabled"
+                text("enable_events", language), value=True, key="events_enabled"
             )
             tile_style = st.radio(
-                "Tile style",
-                options=["Colors", "Images"],
+                text("tile_style", language),
+                options=[text("colors", language), text("images", language)],
                 horizontal=True,
             )
-            tile_mode = "colors" if tile_style == "Colors" else "folder"
+            tile_mode = "colors" if tile_style == text("colors", language) else "folder"
             narration_position = st.radio(
-                "Narration",
-                options=["Above map", "Right side"],
+                text("narration", language),
+                options=[text("above_map", language), text("right_side", language)],
                 horizontal=True,
             )
-            if st.button("Reset game", use_container_width=True):
+            if st.button(text("reset_game", language), use_container_width=True):
                 st.session_state.game_state = new_game_state()
                 st.session_state.event_rng = Random()
                 state = st.session_state.game_state
@@ -247,35 +268,36 @@ def main() -> None:
     )
 
     display_width = round(frame.width * map_zoom / 100)
-    if narration_position == "Above map":
-        render_narration_panel()
+    if narration_position == text("above_map", language):
+        render_narration_panel(language)
         st.image(frame, width=display_width)
     else:
         map_column, narration_column = st.columns([2, 1], gap="large")
         with map_column:
             st.image(frame, width=display_width)
         with narration_column:
-            render_narration_panel(sidebar=True)
+            render_narration_panel(language, sidebar=True)
 
     biome = MAP.biome_at(*position)
     st.write(
-        f"**Position:** x={position[0]}, y={position[1]}  ·  "
-        f"**Biome:** {biome.display_name}  ·  **Turn:** {state.turn}"
+        f"**{text('position', language)}:** x={position[0]}, y={position[1]}  ·  "
+        f"**{text('biome', language)}:** {biome_name(biome.key, language)}  ·  "
+        f"**{text('turn', language)}:** {state.turn}"
     )
 
     if state.log:
-        st.subheader("Recent turns")
+        st.subheader(text("recent_turns", language))
         for entry in reversed(state.log[-5:]):
             st.write(f"- {entry}")
 
     if state.inventory:
-        st.write("**Inventory:** " + ", ".join(state.inventory))
+        st.write(f"**{text('inventory', language)}:** " + ", ".join(state.inventory))
     active_clues = [key for key, active in state.status.items() if active]
     if active_clues:
-        st.write("**Known clues:** " + ", ".join(active_clues))
+        st.write(f"**{text('known_clues', language)}:** " + ", ".join(active_clues))
 
     if state.is_victory():
-        st.success(f"You reached the objective in {state.turn} turns!")
+        st.success(text("victory", language, turn=state.turn))
 
 
 if __name__ == "__main__":

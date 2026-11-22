@@ -162,6 +162,24 @@ def test_hint_event_records_clue_in_state():
     assert "following the road is often safer" in state.log[-1]
 
 
+def test_event_text_can_be_resolved_in_spanish():
+    state, game_map = make_state_and_map()
+
+    result = resolve_move(
+        state,
+        game_map,
+        "right",
+        rng=FirstChoiceRandom(),
+        event_chance=1,
+        language="es",
+    )
+
+    assert result.event_id == "road_signpost"
+    assert result.event_text.endswith(
+        "seguir el camino suele ser más seguro."
+    )
+
+
 def test_give_clue_event_records_reward_hint_as_status():
     state, game_map = make_state_and_map()
 

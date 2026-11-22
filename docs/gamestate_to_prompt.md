@@ -177,6 +177,12 @@ Current turn input
 
 That structure is explicitly aligned with the fog-of-war prompt design, where the engine provides the final mechanical truth and the LLM turns it into grounded narration.[cite:1]
 
+## Language selection
+
+The Streamlit sandbox exposes English and Spanish as supported interface languages. The selected language is passed to the rules layer, so event descriptions, clues, movement outcomes, and UI labels stay consistent; the engine's event identifiers and structured state remain language-neutral.
+
+When LLM narration is added, the selected language must also be included as an explicit prompt parameter. The narrator should generate narration, dialogue, and hints in that language, while continuing to describe only the mechanical result supplied by the engine. This keeps localization separate from game truth and avoids having the model infer the player's language from free-form text.
+
 ## Suggested prompt structure
 
 A strong prompt can be split into four parts:

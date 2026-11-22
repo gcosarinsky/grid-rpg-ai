@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
+from random import Random
 
 import streamlit as st
 
-from grid_rpg_ai.data.maps import MapData, get_map, in_bounds, is_walkable
+from grid_rpg_ai.data.maps import get_map
+from grid_rpg_ai.gamestate import GameState
 from grid_rpg_ai.render import (
     TILE_SIZE,
     build_static_map,
@@ -13,15 +14,10 @@ from grid_rpg_ai.render import (
     load_tiles,
     render_frame,
 )
+from grid_rpg_ai.rules import DEFAULT_EVENT_CHANCE, resolve_move
 
 
 MAP = get_map()
-DIRECTIONS = {
-    "Up": (0, -1),
-    "Left": (-1, 0),
-    "Down": (0, 1),
-    "Right": (1, 0),
-}
 
 
 @st.cache_resource
@@ -34,31 +30,50 @@ def cached_tiles(mode: str):
     )
 
 
-def attempt_move(
-    game_map: MapData, position: tuple[int, int], direction: str
-) -> tuple[tuple[int, int], Optional[str]]:
-    if direction not in DIRECTIONS:
-        raise ValueError(f"Unknown movement direction: {direction!r}")
-
-    dx, dy = DIRECTIONS[direction]
-    destination = (position[0] + dx, position[1] + dy)
-    if not in_bounds(game_map, *destination):
-        return position, "You cannot leave the map."
-    if not is_walkable(game_map, *destination):
-        return position, "That terrain blocks movement."
-    return destination, None
+def new_game_state() -> GameState:
+    return GameState(
+        rows=MAP.height,
+        cols=MAP.width,
+        player_pos=MAP.start,
+        goal_pos=MAP.goal,
+    )
 
 
 def initialize_session() -> None:
-    if "player_pos" not in st.session_state:
-        st.session_state.player_pos = MAP.start
-        st.session_state.discovered = set()
-        st.session_state.move_message = ""
+    if "game_state" not in st.session_state:
+        st.session_state.game_state = new_game_state()
+    if "event_rng" not in st.session_state:
+        st.session_state.event_rng = Random()
+
+
+def move_player(direction: str, event_chance: float) -> None:
+    state: GameState = st.session_state.game_state
+    result = resolve_move(
+        state,
+        MAP,
+        direction,
+        rng=st.session_state.event_rng,
+        event_chance=event_chance,
+    )
+    state.apply_move_result(result)
+
+
+def render_narration_panel(sidebar: bool = False) -> None:
+    extra_class = " narration-panel--sidebar" if sidebar else ""
+    st.markdown(
+        f"""
+        <div class="narration-panel{extra_class}">
+            <div class="narration-label">Narration</div>
+            <p>The adventure narration will appear here.</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def main() -> None:
     st.set_page_config(
-        page_title="Fog of War Sandbox",
+        page_title="Grid RPG Engine Sandbox",
         page_icon="🧭",
         layout="wide",
     )
@@ -67,80 +82,152 @@ def main() -> None:
         <style>
             .block-container {
                 max-width: 100%;
-                padding-left: 1.5rem;
-                padding-right: 1.5rem;
-                padding-top: 1.5rem;
+                padding: 0.75rem 1.25rem 1rem;
+            }
+            [data-testid="stHeader"] {
+                display: none;
+            }
+            [data-testid="stSidebar"] {
+                width: 16rem;
+            }
+            [data-testid="stSidebar"] > div {
+                padding-top: 0.5rem;
+            }
+            [data-testid="stSidebar"] [data-testid="stVerticalBlock"] {
+                gap: 0.35rem;
+            }
+            [data-testid="stSidebar"] h1 {
+                font-size: 1.65rem;
+                line-height: 1.15;
+                margin-bottom: 0.15rem;
+            }
+            [data-testid="stSidebar"] h2,
+            [data-testid="stSidebar"] h3 {
+                font-size: 1.1rem;
+                margin: 0.2rem 0;
+            }
+            [data-testid="stSidebar"] .stSlider,
+            [data-testid="stSidebar"] .stCheckbox,
+            [data-testid="stSidebar"] .stRadio {
+                margin-bottom: -0.35rem;
             }
             [data-testid="stSidebar"] .stButton > button {
-                min-height: 2.25rem;
-                padding: 0.25rem 0.5rem;
+                min-height: 2rem;
+                padding: 0.15rem 0.4rem;
             }
-            [data-testid="stVerticalBlockBorderWrapper"] {
-                margin-bottom: 0.25rem;
+            [data-testid="stSidebar"] hr {
+                margin: 0.45rem 0;
+            }
+            .narration-panel {
+                min-height: 5rem;
+                margin-bottom: 0.75rem;
+                padding: 0.75rem 1rem;
+                border: 1px solid rgba(128, 128, 128, 0.3);
+                border-radius: 0.5rem;
+                background: rgba(128, 128, 128, 0.08);
+            }
+            .narration-panel .narration-label {
+                margin-bottom: 0.35rem;
+                color: #777;
+                font-size: 0.75rem;
+                font-weight: 600;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+            }
+            .narration-panel p {
+                margin: 0;
+            }
+            .narration-panel--sidebar {
+                min-height: 14rem;
             }
         </style>
         """,
         unsafe_allow_html=True,
     )
     initialize_session()
-    st.title("Fog of War Sandbox")
-    st.caption("Grid movement and visibility demo; it does not use the game engine.")
+    state: GameState = st.session_state.game_state
 
     with st.sidebar:
-        st.header("Settings")
-        radius = st.slider("Vision radius", min_value=1, max_value=4, value=2)
-        map_zoom = st.slider(
-            "Map zoom",
-            min_value=50,
-            max_value=200,
-            value=100,
-            step=10,
-            format="%d%%",
+        st.title("Grid RPG Engine Sandbox")
+        st.caption("Playable movement, biome events, discovery, and fog-of-war loop.")
+        st.subheader("Move")
+        event_chance = (
+            DEFAULT_EVENT_CHANCE
+            if st.session_state.get("events_enabled", True)
+            else 0.0
         )
-        fog_enabled = st.checkbox("Enable fog of war", value=True)
-        tile_mode = st.radio("Tile style", options=["Colors", "Images"], horizontal=True)
-        tile_mode = "colors" if tile_mode == "Colors" else "folder"
-        if st.button("Reset position", use_container_width=True):
-            st.session_state.player_pos = MAP.start
-            st.session_state.discovered = set()
-            st.session_state.move_message = ""
+        controls_disabled = state.is_victory()
+        top = st.columns(3)
+        if top[1].button(
+            "⬆️", use_container_width=True, help="Move up", disabled=controls_disabled
+        ):
+            move_player("up", event_chance)
+        middle = st.columns(3)
+        if middle[0].button(
+            "⬅️", use_container_width=True, help="Move left", disabled=controls_disabled
+        ):
+            move_player("left", event_chance)
+        if middle[2].button(
+            "➡️", use_container_width=True, help="Move right", disabled=controls_disabled
+        ):
+            move_player("right", event_chance)
+        bottom = st.columns(3)
+        if bottom[1].button(
+            "⬇️", use_container_width=True, help="Move down", disabled=controls_disabled
+        ):
+            move_player("down", event_chance)
 
         st.divider()
-        st.subheader("Move")
-        top = st.columns(3)
-        if top[1].button("⬆️", use_container_width=True, help="Move up"):
-            position, message = attempt_move(MAP, st.session_state.player_pos, "Up")
-            st.session_state.player_pos = position
-            st.session_state.move_message = message or ""
-        middle = st.columns(3)
-        if middle[0].button("⬅️", use_container_width=True, help="Move left"):
-            position, message = attempt_move(MAP, st.session_state.player_pos, "Left")
-            st.session_state.player_pos = position
-            st.session_state.move_message = message or ""
-        if middle[2].button("➡️", use_container_width=True, help="Move right"):
-            position, message = attempt_move(MAP, st.session_state.player_pos, "Right")
-            st.session_state.player_pos = position
-            st.session_state.move_message = message or ""
-        bottom = st.columns(3)
-        if bottom[1].button("⬇️", use_container_width=True, help="Move down"):
-            position, message = attempt_move(MAP, st.session_state.player_pos, "Down")
-            st.session_state.player_pos = position
-            st.session_state.move_message = message or ""
+        with st.expander("Settings", expanded=False):
+            radius = st.slider("Vision radius", min_value=1, max_value=4, value=2)
+            map_zoom = st.slider(
+                "Map zoom",
+                min_value=50,
+                max_value=200,
+                value=100,
+                step=10,
+                format="%d%%",
+            )
+            fog_enabled = st.checkbox(
+                "Enable fog of war", value=True, key="fog_enabled"
+            )
+            st.checkbox(
+                "Enable biome events", value=True, key="events_enabled"
+            )
+            tile_style = st.radio(
+                "Tile style",
+                options=["Colors", "Images"],
+                horizontal=True,
+            )
+            tile_mode = "colors" if tile_style == "Colors" else "folder"
+            narration_position = st.radio(
+                "Narration",
+                options=["Above map", "Right side"],
+                horizontal=True,
+            )
+            if st.button("Reset game", use_container_width=True):
+                st.session_state.game_state = new_game_state()
+                st.session_state.event_rng = Random()
+                state = st.session_state.game_state
 
-    position = st.session_state.player_pos
+    position = state.player_pos
+    discovered_coords = {
+        (x, y)
+        for y, row in enumerate(state.discovered)
+        for x, discovered in enumerate(row)
+        if discovered
+    }
     visibility = compute_visibility(
         MAP.width,
         MAP.height,
         position,
-        st.session_state.discovered,
+        discovered_coords,
         radius,
     )
-    st.session_state.discovered.update(
-        (x, y)
-        for y, row in enumerate(visibility)
-        for x, state in enumerate(row)
-        if state == "visible"
-    )
+    for y, row in enumerate(visibility):
+        for x, visibility_state in enumerate(row):
+            if visibility_state == "visible":
+                state.discover((x, y))
     displayed_visibility = (
         visibility
         if fog_enabled
@@ -158,18 +245,37 @@ def main() -> None:
         tile_size=TILE_SIZE,
         goal_pos=MAP.goal,
     )
-    display_width = round(frame.width * 2.5 * map_zoom / 100)
-    st.image(frame, width=display_width)
+
+    display_width = round(frame.width * map_zoom / 100)
+    if narration_position == "Above map":
+        render_narration_panel()
+        st.image(frame, width=display_width)
+    else:
+        map_column, narration_column = st.columns([2, 1], gap="large")
+        with map_column:
+            st.image(frame, width=display_width)
+        with narration_column:
+            render_narration_panel(sidebar=True)
 
     biome = MAP.biome_at(*position)
     st.write(
         f"**Position:** x={position[0]}, y={position[1]}  ·  "
-        f"**Biome:** {biome.display_name}"
+        f"**Biome:** {biome.display_name}  ·  **Turn:** {state.turn}"
     )
-    if st.session_state.move_message:
-        st.info(st.session_state.move_message)
-    if position == MAP.goal:
-        st.success("You reached the objective!")
+
+    if state.log:
+        st.subheader("Recent turns")
+        for entry in reversed(state.log[-5:]):
+            st.write(f"- {entry}")
+
+    if state.inventory:
+        st.write("**Inventory:** " + ", ".join(state.inventory))
+    active_clues = [key for key, active in state.status.items() if active]
+    if active_clues:
+        st.write("**Known clues:** " + ", ".join(active_clues))
+
+    if state.is_victory():
+        st.success(f"You reached the objective in {state.turn} turns!")
 
 
 if __name__ == "__main__":

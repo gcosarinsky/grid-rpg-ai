@@ -8,6 +8,106 @@ The goal of the MVP is to produce a playable demo that is small enough to finish
 
 A good MVP target is a single-player adventure where the player moves through a 6x6 map trying to reach a fixed objective such as a treasure tile or a tavern tile. This fits the existing grid structure and keeps the win condition easy to understand in a short demo [cite:1].
 
+## Current development checkpoint
+
+Last updated: 2026-11-22.
+
+The deterministic MVP is now playable through `examples/fog_sandbox.py`. The repository uses Python 3.10+ and the local development environment is managed with `uv`.
+
+### Completed
+
+- `grid_rpg_ai/gamestate.py`
+  - Canonical game state, turns, logs, inventory, status flags, and discovery.
+  - Move results are applied without mixing state and movement rules.
+  - Coordinates consistently use `(x, y)` while grids use `[y][x]`.
+- `grid_rpg_ai/rules.py`
+  - Movement bounds and biome walkability.
+  - Direction aliases.
+  - Biome event selection with injectable randomness.
+  - Bounded event effects: no effect, block, adjacent detour, and persisted clues.
+  - Victory remains a `GameState` responsibility.
+- `grid_rpg_ai/data/dataevents.py`
+  - Static events grouped by biome.
+  - Validation for supported effects and clue requirements.
+- `grid_rpg_ai/render.py`
+  - Image/color tiles, player and goal sprites, and fog of war.
+- `examples/fog_sandbox.py`
+  - Integrated loop: `GameState` -> `resolve_move` -> `apply_move_result` -> rendering.
+  - Movement controls, reset, turn count, recent log, event toggle, discovery, and victory display.
+- Tests
+  - Rules and event-resolution coverage in `tests/test_rules.py`.
+  - Current verification: 24 tests pass.
+
+Run the integrated sandbox from the repository root:
+
+```powershell
+uv sync
+uv run streamlit run examples/fog_sandbox.py
+```
+
+### Remaining plan
+
+#### Phase 5: LLM narration
+
+Create `grid_rpg_ai/llm.py` and keep it downstream from the rules engine.
+
+1. Define a compact narration context containing:
+   - current action and intended direction;
+   - current biome;
+   - resolved `MoveResult`;
+   - final position;
+   - relevant inventory and status flags;
+   - last 3-5 meaningful log entries;
+   - player-visible objective information.
+2. Add `build_narration_prompt` without leaking hidden coordinates into player knowledge.
+3. Add an LLM client behind a small mockable provider interface.
+4. Require short output, preferably 1-3 sentences.
+5. Narrate the resolved engine result only. The model must not approve movement, select a destination, or change event effects.
+6. Keep an explicit deterministic fallback when the provider fails or no API key exists.
+7. Add focused tests with a fake provider:
+   - prompt grounding;
+   - hidden-goal protection;
+   - provider failure fallback;
+   - narration of blocked moves and detours.
+
+#### Phase 6: Connect narration to Streamlit
+
+1. Pass the committed `MoveResult` and resulting `GameState` to the prompt builder.
+2. Persist only the latest narration in `st.session_state`.
+3. Display narration separately from mechanical log entries.
+4. Avoid provider calls during initial rendering or unrelated widget changes.
+5. Keep the game playable when narration is disabled or unavailable.
+6. Decide and document secrets configuration in `.streamlit/secrets.toml.example`.
+
+#### Phase 7: Prepare `app.py`
+
+Refactor the working sandbox into the repository-facing application:
+
+1. Move stable UI helpers out of `examples/fog_sandbox.py`.
+2. Keep the example thin or replace its documented entry point with `app.py`.
+3. Add clear objective, narration, log, reset, and status panels.
+4. Preserve a no-LLM mode for local use and tests.
+5. Keep movement and event resolution out of UI callbacks.
+
+#### Phase 8: Validate and polish the MVP
+
+1. Run the full suite with `uv run pytest -q`.
+2. Add an end-to-end movement -> event -> state -> narration test.
+3. Remove the Pillow deprecation warning in the tests if compatible with Python 3.10+.
+4. Update README screenshots and entry-point instructions.
+5. Confirm the sandbox and `app.py` share the same loop without duplication.
+
+### Resume checklist
+
+Before starting the next session:
+
+1. Confirm the branch and worktree with `git status --short --branch`.
+2. Read this checkpoint section.
+3. Run `uv run pytest -q`.
+4. Start Phase 5 with `llm.py`; do not integrate LLM-generated events yet.
+
+LLM-suggested events remain a later extension. The model may propose structured content, but `rules.py` must validate and resolve every mechanical effect.
+
 ## MVP scope
 
 The first version should be intentionally narrow:
@@ -152,13 +252,15 @@ Once the engine works, the same system can support different mission types:
 
 ## Implementation order
 
-A practical build order is:
+A practical revised build order is:
 
-1. Build `game_state.py` and `rules.py` first.
-2. Add `render.py` to display the grid and player.
-3. Connect everything in `app.py` with Streamlit buttons and session state [cite:1].
-4. Add `llm.py` only after the base loop is already playable.
-5. Add structured events before adding NPCs or retrieval.
+1. Complete the deterministic state, rules, event, and rendering loop. **Done.**
+2. Integrate the loop in the Streamlit sandbox. **Done.**
+3. Add grounded narration in `llm.py`. **Next.**
+4. Connect narration to Streamlit without blocking deterministic play.
+5. Refactor the sandbox into the final `app.py`.
+6. Add structured LLM event suggestions only after narration is stable and validated.
+7. Add NPCs or retrieval only after the core MVP is complete.
 
 This order reduces debugging difficulty because state and movement issues are solved before narrative complexity is added.
 

@@ -70,7 +70,7 @@ This structure keeps rendering independent from rules, and it makes the project 
 
 ## Fog of war sandbox
 
-The experimental Streamlit demo runs the integrated game loop: validated movement, biome events, persistent state, discovery, fog of war, and victory checks:
+The experimental Streamlit demo runs the integrated game loop: validated movement, biome events, persistent state, discovery, fog of war, and victory checks. Run it from the repository root with:
 
 ```powershell
 uv sync
@@ -150,15 +150,17 @@ grid-rpg-ai/
 
 This repository is currently a **work in progress**.
 
-The architecture and MVP scope are already defined, but the implementation is still being assembled. The focus right now is on keeping the first version small, clear, and demo-friendly, then expanding the LLM role in controlled ways.
+The deterministic game loop is implemented and playable through the Streamlit sandbox. Movement, biome events, state persistence, fog of war, discovery, and victory checks are connected. The next major step is grounded LLM narration.
 
 ## Next steps
 
-- Extend `rules.py` with event resolution on top of the implemented movement validation and win-state checks.
-- Build the Streamlit app in `app.py`.
-- Create and connect `llm.py` once the base loop is already playable.
-- Add `render.py` for map and status visualization.
+- Create `llm.py` with a compact prompt, mockable provider, and deterministic fallback.
+- Connect resolved turn narration to the Streamlit session.
+- Refactor the integrated sandbox into the final `app.py`.
+- Add an end-to-end movement, event, state, and narration test.
 - Add a clean screenshot or GIF for the repository page.
+
+See the [current development checkpoint](./docs/rpg_llm_mvp_roadmap.md) for the full session-to-session implementation plan.
 
 ## Future ideas
 

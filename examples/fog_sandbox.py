@@ -58,6 +58,19 @@ def move_player(direction: str, event_chance: float) -> None:
     state.apply_move_result(result)
 
 
+def render_narration_panel(sidebar: bool = False) -> None:
+    extra_class = " narration-panel--sidebar" if sidebar else ""
+    st.markdown(
+        f"""
+        <div class="narration-panel{extra_class}">
+            <div class="narration-label">Narration</div>
+            <p>The adventure narration will appear here.</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def main() -> None:
     st.set_page_config(
         page_title="Grid RPG Engine Sandbox",
@@ -69,16 +82,63 @@ def main() -> None:
         <style>
             .block-container {
                 max-width: 100%;
-                padding-left: 1.5rem;
-                padding-right: 1.5rem;
-                padding-top: 1.5rem;
+                padding: 0.75rem 1.25rem 1rem;
+            }
+            [data-testid="stHeader"] {
+                display: none;
+            }
+            [data-testid="stSidebar"] {
+                width: 16rem;
+            }
+            [data-testid="stSidebar"] > div {
+                padding-top: 0.5rem;
+            }
+            [data-testid="stSidebar"] [data-testid="stVerticalBlock"] {
+                gap: 0.35rem;
+            }
+            [data-testid="stSidebar"] h1 {
+                font-size: 1.65rem;
+                line-height: 1.15;
+                margin-bottom: 0.15rem;
+            }
+            [data-testid="stSidebar"] h2,
+            [data-testid="stSidebar"] h3 {
+                font-size: 1.1rem;
+                margin: 0.2rem 0;
+            }
+            [data-testid="stSidebar"] .stSlider,
+            [data-testid="stSidebar"] .stCheckbox,
+            [data-testid="stSidebar"] .stRadio {
+                margin-bottom: -0.35rem;
             }
             [data-testid="stSidebar"] .stButton > button {
-                min-height: 2.25rem;
-                padding: 0.25rem 0.5rem;
+                min-height: 2rem;
+                padding: 0.15rem 0.4rem;
             }
-            [data-testid="stVerticalBlockBorderWrapper"] {
-                margin-bottom: 0.25rem;
+            [data-testid="stSidebar"] hr {
+                margin: 0.45rem 0;
+            }
+            .narration-panel {
+                min-height: 5rem;
+                margin-bottom: 0.75rem;
+                padding: 0.75rem 1rem;
+                border: 1px solid rgba(128, 128, 128, 0.3);
+                border-radius: 0.5rem;
+                background: rgba(128, 128, 128, 0.08);
+            }
+            .narration-panel .narration-label {
+                margin-bottom: 0.35rem;
+                color: #777;
+                font-size: 0.75rem;
+                font-weight: 600;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+            }
+            .narration-panel p {
+                margin: 0;
+            }
+            .narration-panel--sidebar {
+                min-height: 14rem;
             }
         </style>
         """,
@@ -86,32 +146,16 @@ def main() -> None:
     )
     initialize_session()
     state: GameState = st.session_state.game_state
-    st.title("Grid RPG Engine Sandbox")
-    st.caption("Playable movement, biome events, discovery, and fog-of-war loop.")
 
     with st.sidebar:
-        st.header("Settings")
-        radius = st.slider("Vision radius", min_value=1, max_value=4, value=2)
-        map_zoom = st.slider(
-            "Map zoom",
-            min_value=50,
-            max_value=200,
-            value=100,
-            step=10,
-            format="%d%%",
-        )
-        fog_enabled = st.checkbox("Enable fog of war", value=True)
-        events_enabled = st.checkbox("Enable biome events", value=True)
-        event_chance = DEFAULT_EVENT_CHANCE if events_enabled else 0.0
-        tile_mode = st.radio("Tile style", options=["Colors", "Images"], horizontal=True)
-        tile_mode = "colors" if tile_mode == "Colors" else "folder"
-        if st.button("Reset game", use_container_width=True):
-            st.session_state.game_state = new_game_state()
-            st.session_state.event_rng = Random()
-            state = st.session_state.game_state
-
-        st.divider()
+        st.title("Grid RPG Engine Sandbox")
+        st.caption("Playable movement, biome events, discovery, and fog-of-war loop.")
         st.subheader("Move")
+        event_chance = (
+            DEFAULT_EVENT_CHANCE
+            if st.session_state.get("events_enabled", True)
+            else 0.0
+        )
         controls_disabled = state.is_victory()
         top = st.columns(3)
         if top[1].button(
@@ -132,6 +176,39 @@ def main() -> None:
             "⬇️", use_container_width=True, help="Move down", disabled=controls_disabled
         ):
             move_player("down", event_chance)
+
+        st.divider()
+        with st.expander("Settings", expanded=False):
+            radius = st.slider("Vision radius", min_value=1, max_value=4, value=2)
+            map_zoom = st.slider(
+                "Map zoom",
+                min_value=50,
+                max_value=200,
+                value=100,
+                step=10,
+                format="%d%%",
+            )
+            fog_enabled = st.checkbox(
+                "Enable fog of war", value=True, key="fog_enabled"
+            )
+            st.checkbox(
+                "Enable biome events", value=True, key="events_enabled"
+            )
+            tile_style = st.radio(
+                "Tile style",
+                options=["Colors", "Images"],
+                horizontal=True,
+            )
+            tile_mode = "colors" if tile_style == "Colors" else "folder"
+            narration_position = st.radio(
+                "Narration",
+                options=["Above map", "Right side"],
+                horizontal=True,
+            )
+            if st.button("Reset game", use_container_width=True):
+                st.session_state.game_state = new_game_state()
+                st.session_state.event_rng = Random()
+                state = st.session_state.game_state
 
     position = state.player_pos
     discovered_coords = {
@@ -168,8 +245,17 @@ def main() -> None:
         tile_size=TILE_SIZE,
         goal_pos=MAP.goal,
     )
-    display_width = round(frame.width * 2.5 * map_zoom / 100)
-    st.image(frame, width=display_width)
+
+    display_width = round(frame.width * map_zoom / 100)
+    if narration_position == "Above map":
+        render_narration_panel()
+        st.image(frame, width=display_width)
+    else:
+        map_column, narration_column = st.columns([2, 1], gap="large")
+        with map_column:
+            st.image(frame, width=display_width)
+        with narration_column:
+            render_narration_panel(sidebar=True)
 
     biome = MAP.biome_at(*position)
     st.write(

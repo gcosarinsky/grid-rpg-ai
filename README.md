@@ -68,20 +68,46 @@ Planned module responsibilities:
 
 This structure keeps rendering independent from rules, and it makes the project easier to test and extend.
 
-## Fog of war sandbox
+## Debug app
 
 The experimental Streamlit demo runs the integrated game loop: validated movement, biome events, persistent state, discovery, fog of war, and victory checks. Run it from the repository root with:
 
 ```powershell
 uv sync
-uv run streamlit run examples/fog_sandbox.py
+uv run streamlit run examples/debug_app.py
 ```
 
-`uv sync` installs the project in editable mode, so the demo imports `grid_rpg_ai` as an installed package rather than modifying `sys.path`.
+`uv sync` installs the project in editable mode, so the app imports `grid_rpg_ai` as an installed package rather than modifying `sys.path`.
 
-Use the arrow buttons to move. The sandbox supports biome events, resettable `GameState`, recent-turn history, color or image tiles, an adjustable vision radius, fog toggles, and an English/Spanish language selector. The selected language also controls the mechanical event phrases and clues shown in the turn log. Its player and goal markers are procedurally drawn RGBA sprites with transparent backgrounds.
+Use the arrow buttons to move. The debug app supports biome events, resettable `GameState`, recent-turn history, color or image tiles, an adjustable vision radius, fog toggles, and an English/Spanish language selector. The selected language also controls the mechanical event phrases and clues shown in the turn log. Its player and goal markers are procedurally drawn RGBA sprites with transparent backgrounds.
 
-The language selection is already carried into the rules layer through `resolve_move(..., language=...)`. When the LLM narration layer is connected, the same setting must be included in the narration prompt so generated narration, dialogue, and hints use the selected language too.
+The language selection is carried into both the rules layer and the narration prompt, so generated narration uses the selected language.
+
+## Local narration provider
+
+The first narration provider is Ollama. Install Ollama separately and start its local server in a terminal:
+
+```powershell
+ollama serve
+```
+
+Keep that terminal open. If Ollama is already running (for example, through its Windows application), do not start a second server. In another terminal, download the default model:
+
+```powershell
+ollama pull llama3.1:8b
+```
+
+`grid_rpg_ai.llm` builds a bounded prompt from a resolved move and exposes an `OllamaProvider`; it uses Ollama's local HTTP API and does not require an API key. Provider integration in the Streamlit debug app is the next implementation step. Provider errors can be reported alongside a deterministic fallback, so narration does not control movement or prevent the game from continuing.
+
+The prompt gives the model environmental cues instead of biome names and asks for evocative narration without coordinates or explicit biome names, with style examples. These instructions guide the model but do not guarantee compliance; the engine remains authoritative.
+
+To see an example prompt and Ollama's response in the terminal, run:
+
+```powershell
+uv run python examples/narration_demo.py
+```
+
+The script uses the default model above. To choose another installed model, add `--model <model-name>`. It connects to Ollama at `http://localhost:11434`, allows up to 120 seconds for the request, and reports errors if the service or model is unavailable.
 
 ## Why this project
 
@@ -152,11 +178,11 @@ grid-rpg-ai/
 
 This repository is currently a **work in progress**.
 
-The deterministic game loop is implemented and playable through the Streamlit sandbox. Movement, biome events, state persistence, fog of war, discovery, and victory checks are connected. The next major step is grounded LLM narration.
+The deterministic game loop is implemented and playable through the Streamlit debug app. Movement, biome events, state persistence, fog of war, discovery, and victory checks are connected. Grounded narration prompts and the local Ollama provider are implemented; connecting provider selection and narration display to the debug app is next.
 
 ## Next steps
 
-- Create `llm.py` with a compact prompt, mockable provider, and deterministic fallback.
+- Connect the `llm.py` prompt builder, Ollama provider, and deterministic fallback to the debug app.
 - Connect resolved turn narration to the Streamlit session.
 - Refactor the integrated sandbox into the final `app.py`.
 - Add an end-to-end movement, event, state, and narration test.
@@ -184,7 +210,7 @@ The roadmap suggests using:
 
 - `Streamlit` for the UI.
 - `st.session_state` for persistence during play.
-- `st.secrets` for API key handling.
+- `st.secrets` or environment variables for future API key handling.
 - Short prompts with structured context for the LLM layer.
 - A modular architecture where rules, rendering, and narrative generation remain separate.
 

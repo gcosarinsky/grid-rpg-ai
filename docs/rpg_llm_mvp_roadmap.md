@@ -10,9 +10,9 @@ A good MVP target is a single-player adventure where the player moves through a 
 
 ## Current development checkpoint
 
-Last updated: 2026-11-22.
+Last updated: 2026-11-27.
 
-The deterministic MVP is now playable through `examples/fog_sandbox.py`. The repository uses Python 3.10+ and the local development environment is managed with `uv`.
+The deterministic MVP is playable through `examples/debug_app.py`. The repository uses Python 3.10+ and the local development environment is managed with `uv`.
 
 ### Completed
 
@@ -31,44 +31,32 @@ The deterministic MVP is now playable through `examples/fog_sandbox.py`. The rep
   - Validation for supported effects and clue requirements.
 - `grid_rpg_ai/render.py`
   - Image/color tiles, player and goal sprites, and fog of war.
-- `examples/fog_sandbox.py`
+- `examples/debug_app.py`
   - Integrated loop: `GameState` -> `resolve_move` -> `apply_move_result` -> rendering.
   - Movement controls, reset, turn count, recent log, event toggle, discovery, and victory display.
 - Tests
   - Rules and event-resolution coverage in `tests/test_rules.py`.
-  - Current verification: 24 tests pass.
+  - Narration prompt, Ollama adapter, and fallback coverage in `tests/test_llm.py`.
 
-Run the integrated sandbox from the repository root:
+Run the integrated debug app from the repository root:
 
 ```powershell
 uv sync
-uv run streamlit run examples/fog_sandbox.py
+uv run streamlit run examples/debug_app.py
 ```
 
 ### Remaining plan
 
-#### Phase 5: LLM narration
+#### Phase 5: LLM narration — core complete
 
-Create `grid_rpg_ai/llm.py` and keep it downstream from the rules engine.
+`grid_rpg_ai/llm.py` remains downstream from the rules engine. The initial local-provider implementation is complete:
 
-1. Define a compact narration context containing:
-   - current action and intended direction;
-   - current biome;
-   - resolved `MoveResult`;
-   - final position;
-   - relevant inventory and status flags;
-   - last 3-5 meaningful log entries;
-   - player-visible objective information.
-2. Add `build_narration_prompt` without leaking hidden coordinates into player knowledge.
-3. Add an LLM client behind a small mockable provider interface.
-4. Require short output, preferably 1-3 sentences.
-5. Narrate the resolved engine result only. The model must not approve movement, select a destination, or change event effects.
-6. Keep an explicit deterministic fallback when the provider fails or no API key exists.
-7. Add focused tests with a fake provider:
-   - prompt grounding;
-   - hidden-goal protection;
-   - provider failure fallback;
-   - narration of blocked moves and detours.
+- A compact `NarrationContext` and `build_narration_prompt`, with no hidden goal coordinates.
+- An `OllamaProvider` behind a mockable provider protocol.
+- Deterministic fallback narration for missing or failed providers.
+- Focused tests for prompt grounding, hidden-goal protection, localized output, provider failures, and resolved move outcomes.
+
+Follow-up: add the Google Gemini provider using the same interface, reading its API key from environment variables or Streamlit secrets without committing credentials.
 
 #### Phase 6: Connect narration to Streamlit
 
@@ -77,13 +65,13 @@ Create `grid_rpg_ai/llm.py` and keep it downstream from the rules engine.
 3. Display narration separately from mechanical log entries.
 4. Avoid provider calls during initial rendering or unrelated widget changes.
 5. Keep the game playable when narration is disabled or unavailable.
-6. Decide and document secrets configuration in `.streamlit/secrets.toml.example`.
+6. Document secrets configuration in `.streamlit/secrets.toml.example`; never commit local secrets.
 
 #### Phase 7: Prepare `app.py`
 
 Refactor the working sandbox into the repository-facing application:
 
-1. Move stable UI helpers out of `examples/fog_sandbox.py`.
+1. Move stable UI helpers out of `examples/debug_app.py`.
 2. Keep the example thin or replace its documented entry point with `app.py`.
 3. Add clear objective, narration, log, reset, and status panels.
 4. Preserve a no-LLM mode for local use and tests.
@@ -255,10 +243,10 @@ Once the engine works, the same system can support different mission types:
 A practical revised build order is:
 
 1. Complete the deterministic state, rules, event, and rendering loop. **Done.**
-2. Integrate the loop in the Streamlit sandbox. **Done.**
-3. Add grounded narration in `llm.py`. **Next.**
-4. Connect narration to Streamlit without blocking deterministic play.
-5. Refactor the sandbox into the final `app.py`.
+2. Integrate the loop in the Streamlit debug app. **Done.**
+3. Add grounded narration in `llm.py`. **Done: prompt builder, Ollama provider, fallback, and focused tests.**
+4. Connect narration to Streamlit without blocking deterministic play. **Next.**
+5. Refactor the debug app into the final `app.py`.
 6. Add structured LLM event suggestions only after narration is stable and validated.
 7. Add NPCs or retrieval only after the core MVP is complete.
 

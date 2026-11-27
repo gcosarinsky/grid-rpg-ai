@@ -8,7 +8,7 @@ LANGUAGE_LABELS: dict[Language, str] = {"en": "English", "es": "Español"}
 
 UI_TEXT: dict[str, dict[Language, str]] = {
     "language": {"en": "Language", "es": "Idioma"},
-    "title": {"en": "Grid RPG Engine Sandbox", "es": "Sandbox del motor Grid RPG"},
+    "title": {"en": "Grid RPG Debug App", "es": "App de depuración Grid RPG"},
     "caption": {
         "en": "Playable movement, biome events, discovery, and fog-of-war loop.",
         "es": "Movimiento, eventos de bioma, descubrimiento y niebla de guerra.",

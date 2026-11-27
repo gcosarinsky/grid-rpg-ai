@@ -2,3 +2,4 @@
 grid_rpg_ai.egg-info/
 grid_rpg_ai/assets/raw
 *.pyc
+.streamlit/secrets.toml

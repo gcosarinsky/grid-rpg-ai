@@ -83,7 +83,7 @@ def render_narration_panel(language: Language, sidebar: bool = False) -> None:
 
 def main() -> None:
     st.set_page_config(
-        page_title="Grid RPG Engine Sandbox",
+        page_title="Grid RPG Debug App",
         page_icon="🧭",
         layout="wide",
     )

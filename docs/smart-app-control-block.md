@@ -3,7 +3,7 @@
 Al intentar iniciar el sandbox desde la raíz del proyecto:
 
 ```powershell
-uv run streamlit run examples/fog_sandbox.py
+uv run streamlit run examples/debug_app.py
 ```
 
 Windows bloquea el ejecutable `streamlit` con el error:

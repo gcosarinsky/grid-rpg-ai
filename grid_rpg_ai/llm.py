@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import time
 from dataclasses import dataclass
 from typing import Mapping, Protocol
 from urllib.error import HTTPError, URLError
@@ -49,6 +51,60 @@ class NarrationResponse:
 
 class NarrationError(Exception):
     """Raised when a narration provider cannot return a usable response."""
+
+
+class OllamaUnavailable(NarrationError):
+    """Raised when the local Ollama server cannot be reached."""
+
+
+def list_ollama_models(timeout: float = 2.0) -> list[str]:
+    """Check the local server and return the names of its installed models."""
+    try:
+        with urlopen(f"{DEFAULT_OLLAMA_URL}/api/tags", timeout=timeout) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        raise NarrationError(f"Ollama returned HTTP {exc.code}: {exc.reason}") from exc
+    except (URLError, TimeoutError, OSError) as exc:
+        raise OllamaUnavailable(f"Could not connect to Ollama: {exc}") from exc
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise NarrationError(f"Ollama returned an invalid model list: {exc}") from exc
+
+    if not isinstance(payload, dict) or not isinstance(payload.get("models"), list):
+        raise NarrationError("Ollama returned an invalid model list.")
+    names = []
+    for model in payload["models"]:
+        if not isinstance(model, dict) or not isinstance(model.get("name"), str) or not model["name"]:
+            raise NarrationError("Ollama returned an invalid model name.")
+        names.append(model["name"])
+    return sorted(set(names))
+
+
+def start_ollama() -> list[str]:
+    """Start the local server if needed, and wait briefly for it to respond."""
+    try:
+        return list_ollama_models()
+    except OllamaUnavailable:
+        pass
+
+    try:
+        process = subprocess.Popen(["ollama", "serve"], stdin=subprocess.DEVNULL)
+    except OSError as exc:
+        raise NarrationError(f"Could not start Ollama: {exc}") from exc
+
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        try:
+            return list_ollama_models(timeout=1.0)
+        except OllamaUnavailable:
+            exit_code = process.poll()
+            if exit_code is not None:
+                raise NarrationError(
+                    f"Ollama exited with code {exit_code}; check the application terminal."
+                )
+            time.sleep(0.25)
+    raise NarrationError(
+        "Ollama did not become available within 10 seconds; check the application terminal."
+    )
 
 
 class NarrationProvider(Protocol):

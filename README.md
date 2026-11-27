@@ -81,6 +81,10 @@ uv run streamlit run examples/debug_app.py
 
 Use the arrow buttons to move. The debug app supports biome events, resettable `GameState`, recent-turn history, color or image tiles, an adjustable vision radius, fog toggles, and an English/Spanish language selector. The selected language also controls the mechanical event phrases and clues shown in the turn log. Its player and goal markers are procedurally drawn RGBA sprites with transparent backgrounds.
 
+The **Ollama** sidebar panel checks whether the local server is available, lets you start it or refresh its status, and lists installed models. Select one and enable Ollama narration to generate a response after each move. Narration is disabled by default; when disabled or unavailable, the app uses deterministic narration and remains playable. Provider errors are shown in the app. A generation request can take up to 120 seconds.
+
+The start button runs `ollama serve` on the machine hosting Streamlit, only if the server is not already reachable. Ollama must be installed and available on that machine's PATH; the app does not download models or stop an existing server. Install models separately with `ollama pull <model-name>`, then refresh the list.
+
 The language selection is carried into both the rules layer and the narration prompt, so generated narration uses the selected language.
 
 ## Local narration provider
@@ -97,7 +101,7 @@ Keep that terminal open. If Ollama is already running (for example, through its 
 ollama pull llama3.1:8b
 ```
 
-`grid_rpg_ai.llm` builds a bounded prompt from a resolved move and exposes an `OllamaProvider`; it uses Ollama's local HTTP API and does not require an API key. Provider integration in the Streamlit debug app is the next implementation step. Provider errors can be reported alongside a deterministic fallback, so narration does not control movement or prevent the game from continuing.
+`grid_rpg_ai.llm` builds a bounded prompt from a resolved move and exposes an `OllamaProvider`; it uses Ollama's local HTTP API and does not require an API key. Provider errors can be reported alongside a deterministic fallback, so narration does not control movement or prevent the game from continuing.
 
 The prompt gives the model environmental cues instead of biome names and asks for evocative narration without coordinates or explicit biome names, with style examples. These instructions guide the model but do not guarantee compliance; the engine remains authoritative.
 
@@ -178,12 +182,11 @@ grid-rpg-ai/
 
 This repository is currently a **work in progress**.
 
-The deterministic game loop is implemented and playable through the Streamlit debug app. Movement, biome events, state persistence, fog of war, discovery, and victory checks are connected. Grounded narration prompts and the local Ollama provider are implemented; connecting provider selection and narration display to the debug app is next.
+The deterministic game loop and local Ollama narration are implemented in the Streamlit debug app. Movement, biome events, state persistence, fog of war, discovery, and victory checks are connected.
 
 ## Next steps
 
-- Connect the `llm.py` prompt builder, Ollama provider, and deterministic fallback to the debug app.
-- Connect resolved turn narration to the Streamlit session.
+- Add Google Gemini as an optional narration provider with secure API key configuration.
 - Refactor the integrated sandbox into the final `app.py`.
 - Add an end-to-end movement, event, state, and narration test.
 - Add a clean screenshot or GIF for the repository page.

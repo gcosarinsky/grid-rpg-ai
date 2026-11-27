@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from html import escape
 from pathlib import Path
 from random import Random
 
@@ -7,6 +8,16 @@ import streamlit as st
 
 from grid_rpg_ai.data.maps import get_map
 from grid_rpg_ai.gamestate import GameState
+from grid_rpg_ai.llm import (
+    DEFAULT_OLLAMA_MODEL,
+    NarrationError,
+    NarrationResponse,
+    OllamaProvider,
+    build_narration_context,
+    generate_narration,
+    list_ollama_models,
+    start_ollama,
+)
 from grid_rpg_ai.localization import (
     LANGUAGE_LABELS,
     SUPPORTED_LANGUAGES,
@@ -53,6 +64,54 @@ def initialize_session() -> None:
         st.session_state.event_rng = Random()
     if "language" not in st.session_state:
         st.session_state.language = "en"
+    if "ollama_models" not in st.session_state:
+        refresh_ollama()
+    if "narration_response" not in st.session_state:
+        st.session_state.narration_response = None
+
+
+def refresh_ollama(start: bool = False) -> None:
+    try:
+        models = start_ollama() if start else list_ollama_models()
+    except NarrationError as exc:
+        st.session_state.ollama_models = None
+        st.session_state.ollama_error = str(exc)
+    else:
+        st.session_state.ollama_models = models
+        st.session_state.ollama_error = None
+
+
+def ollama_controls(language: Language) -> None:
+    with st.expander("Ollama", expanded=False):
+        if st.button(text("ollama_check", language), key="ollama_check"):
+            refresh_ollama()
+        if st.button(text("ollama_start", language), key="ollama_start"):
+            with st.spinner(text("starting_ollama", language)):
+                refresh_ollama(start=True)
+
+        models = st.session_state.ollama_models
+        if models is None:
+            st.warning(
+                f"{text('ollama_unavailable', language)}: {st.session_state.ollama_error}"
+            )
+        else:
+            st.success(text("ollama_available", language))
+            if not models:
+                st.info(text("ollama_no_models", language))
+
+        models = models or []
+        if st.session_state.get("ollama_model") not in models:
+            st.session_state.ollama_model = (
+                DEFAULT_OLLAMA_MODEL if DEFAULT_OLLAMA_MODEL in models
+                else (models[0] if models else None)
+            )
+        st.selectbox(
+            text("ollama_model", language),
+            options=models,
+            key="ollama_model",
+            disabled=not models,
+        )
+        st.checkbox(text("enable_llm", language), key="narration_enabled")
 
 
 def move_player(direction: str, event_chance: float, language: Language) -> None:
@@ -66,19 +125,37 @@ def move_player(direction: str, event_chance: float, language: Language) -> None
         language=language,
     )
     state.apply_move_result(result)
+    context = build_narration_context(state, MAP, result, language)
+    if not st.session_state.narration_enabled:
+        st.session_state.narration_response = generate_narration(context)
+    elif not st.session_state.ollama_models or not st.session_state.ollama_model:
+        fallback = generate_narration(context)
+        st.session_state.narration_response = NarrationResponse(
+            text=fallback.text,
+            used_fallback=True,
+            error=text("ollama_select_model", language),
+        )
+    else:
+        provider = OllamaProvider(model=st.session_state.ollama_model, timeout=120)
+        with st.spinner(text("generating_narration", language)):
+            st.session_state.narration_response = generate_narration(context, provider)
 
 
 def render_narration_panel(language: Language, sidebar: bool = False) -> None:
     extra_class = " narration-panel--sidebar" if sidebar else ""
+    response: NarrationResponse | None = st.session_state.narration_response
+    narration = response.text if response else text("narration_placeholder", language)
     st.markdown(
         f"""
         <div class="narration-panel{extra_class}">
             <div class="narration-label">{text("narration_label", language)}</div>
-            <p>{text("narration_placeholder", language)}</p>
+            <p>{escape(narration)}</p>
         </div>
         """,
         unsafe_allow_html=True,
     )
+    if response and response.error:
+        st.warning(f"{text('narration_fallback', language)}: {response.error}")
 
 
 def main() -> None:
@@ -165,6 +242,7 @@ def main() -> None:
         )
         st.title(text("title", language))
         st.caption(text("caption", language))
+        ollama_controls(language)
         st.subheader(text("move", language))
         event_chance = (
             DEFAULT_EVENT_CHANCE
@@ -229,6 +307,7 @@ def main() -> None:
             if st.button(text("reset_game", language), use_container_width=True):
                 st.session_state.game_state = new_game_state()
                 st.session_state.event_rng = Random()
+                st.session_state.narration_response = None
                 state = st.session_state.game_state
 
     position = state.player_pos

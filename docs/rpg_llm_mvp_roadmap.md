@@ -58,14 +58,11 @@ uv run streamlit run examples/debug_app.py
 
 Follow-up: add the Google Gemini provider using the same interface, reading its API key from environment variables or Streamlit secrets without committing credentials.
 
-#### Phase 6: Connect narration to Streamlit
+#### Phase 6: Connect narration to Streamlit — Ollama complete
 
-1. Pass the committed `MoveResult` and resulting `GameState` to the prompt builder.
-2. Persist only the latest narration in `st.session_state`.
-3. Display narration separately from mechanical log entries.
-4. Avoid provider calls during initial rendering or unrelated widget changes.
-5. Keep the game playable when narration is disabled or unavailable.
-6. Document secrets configuration in `.streamlit/secrets.toml.example`; never commit local secrets.
+The debug app passes the committed move to narration, stores and displays the latest response separately, and only generates text when moving. It checks or starts local Ollama, lists installed models, and reports errors while keeping a deterministic fallback.
+
+Follow-up for Gemini: document secrets configuration in `.streamlit/secrets.toml.example`; never commit local secrets.
 
 #### Phase 7: Prepare `app.py`
 
@@ -245,7 +242,7 @@ A practical revised build order is:
 1. Complete the deterministic state, rules, event, and rendering loop. **Done.**
 2. Integrate the loop in the Streamlit debug app. **Done.**
 3. Add grounded narration in `llm.py`. **Done: prompt builder, Ollama provider, fallback, and focused tests.**
-4. Connect narration to Streamlit without blocking deterministic play. **Next.**
+4. Connect Ollama narration to Streamlit with a deterministic fallback. **Done.**
 5. Refactor the debug app into the final `app.py`.
 6. Add structured LLM event suggestions only after narration is stable and validated.
 7. Add NPCs or retrieval only after the core MVP is complete.

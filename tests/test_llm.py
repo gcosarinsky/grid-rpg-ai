@@ -2,17 +2,24 @@ import importlib.util
 import json
 import sys
 from pathlib import Path
+from urllib.error import URLError
 from urllib.request import Request
 
+import pytest
+
+import grid_rpg_ai.llm as llm
 from grid_rpg_ai.data.maps import create_map_from_grid
 from grid_rpg_ai.gamestate import GameState, MoveResult
 from grid_rpg_ai.llm import (
     NarrationError,
     OllamaProvider,
+    OllamaUnavailable,
     build_narration_context,
     build_narration_prompt,
     deterministic_fallback,
     generate_narration,
+    list_ollama_models,
+    start_ollama,
 )
 
 spec = importlib.util.spec_from_file_location(
@@ -199,6 +206,108 @@ def test_ollama_provider_posts_non_streaming_request(monkeypatch):
         "options": {"num_predict": 160},
     }
     assert captured["timeout"] == 4.0
+
+
+def test_list_ollama_models_reads_installed_names(monkeypatch):
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self):
+            return b'{"models": [{"name": "z:latest"}, {"name": "a:8b"}]}'
+
+    def fake_urlopen(url, timeout):
+        assert url == "http://localhost:11434/api/tags"
+        assert timeout == 2.0
+        return FakeResponse()
+
+    monkeypatch.setattr(llm, "urlopen", fake_urlopen)
+    assert list_ollama_models() == ["a:8b", "z:latest"]
+
+
+def test_list_ollama_models_surfaces_unavailable_server(monkeypatch):
+    def fail_urlopen(*args, **kwargs):
+        raise URLError("connection refused")
+
+    monkeypatch.setattr(llm, "urlopen", fail_urlopen)
+    with pytest.raises(OllamaUnavailable, match="connection refused"):
+        list_ollama_models()
+
+
+def test_list_ollama_models_rejects_malformed_response(monkeypatch):
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self):
+            return b'{"models": [{"name": 42}]}'
+
+    monkeypatch.setattr(llm, "urlopen", lambda *args, **kwargs: FakeResponse())
+    with pytest.raises(NarrationError, match="invalid model name"):
+        list_ollama_models()
+
+
+def test_start_ollama_does_not_launch_a_second_server(monkeypatch):
+    monkeypatch.setattr(llm, "list_ollama_models", lambda: ["model:latest"])
+
+    def fail_if_started(*args, **kwargs):
+        pytest.fail("An already running server must not be restarted")
+
+    monkeypatch.setattr(llm.subprocess, "Popen", fail_if_started)
+    assert start_ollama() == ["model:latest"]
+
+
+def test_start_ollama_starts_server_and_waits_until_ready(monkeypatch):
+    probes = iter([OllamaUnavailable("offline"), ["local:latest"]])
+    launches = []
+
+    def probe(*args, **kwargs):
+        result = next(probes)
+        if isinstance(result, OllamaUnavailable):
+            raise result
+        return result
+
+    def launch(args, **kwargs):
+        launches.append(args)
+        return object()
+
+    monkeypatch.setattr(llm, "list_ollama_models", probe)
+    monkeypatch.setattr(llm.subprocess, "Popen", launch)
+    assert start_ollama() == ["local:latest"]
+    assert launches == [["ollama", "serve"]]
+
+
+def test_start_ollama_surfaces_missing_executable(monkeypatch):
+    def unavailable(*args, **kwargs):
+        raise OllamaUnavailable("offline")
+
+    def missing(*args, **kwargs):
+        raise FileNotFoundError("ollama not found")
+
+    monkeypatch.setattr(llm, "list_ollama_models", unavailable)
+    monkeypatch.setattr(llm.subprocess, "Popen", missing)
+    with pytest.raises(NarrationError, match="ollama not found"):
+        start_ollama()
+
+
+def test_start_ollama_reports_server_exiting(monkeypatch):
+    def unavailable(*args, **kwargs):
+        raise OllamaUnavailable("offline")
+
+    class FailedProcess:
+        def poll(self):
+            return 1
+
+    monkeypatch.setattr(llm, "list_ollama_models", unavailable)
+    monkeypatch.setattr(llm.subprocess, "Popen", lambda *args, **kwargs: FailedProcess())
+    with pytest.raises(NarrationError, match="exited with code 1"):
+        start_ollama()
 
 
 def test_narration_demo_shows_the_prompt_sent_and_response(monkeypatch, capsys):
